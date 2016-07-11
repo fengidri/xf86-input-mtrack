@@ -907,6 +907,56 @@ static int get_scale_dir(const struct Touch* t1,
 	return TR_NONE;
 }
 
+#define  SPEED_MAX 1000
+
+static float calculus_speed(struct Gestures* gs,
+			const struct MConfig* cfg,
+			struct MTState* ms)
+{
+    static struct timeval last;
+    static int dest;
+    static float speed;
+    int dx = 0, dy = 0, i = 0;
+
+	foreach_bit(i, ms->touch_used) {
+		if (GETBIT(ms->touch[i].state, MT_INVALID))
+			continue;
+
+        dx += abs(ms->touch[i].dx);
+        dy += abs(ms->touch[i].dy);
+	}
+
+
+
+    int time = gs->time.tv_sec * 1000000 - last.tv_sec * 1000000 +
+        gs->time.tv_usec - last.tv_usec;
+
+    if (time > 1000 * 1000 * 3)
+    {
+//        printf("Too long\n");
+        speed = 0;
+        dest = (dx + dy) / 2;
+        last = gs->time;
+        return 0;
+    }
+
+    dest += (dx + dy) / 2;
+
+    if (time > 1000 * 100)
+    {
+ //       printf("* speed: %d time %d dest %d\n", speed, time, dest);
+        speed = time ? dest * 1000 / time: SPEED_MAX;
+        speed = speed > 20 ? 20 : speed;
+        speed = speed < 8 ? 1.0 : speed / 8;
+
+        dest = 0;
+        last = gs->time;
+    }
+//    printf("# speed: %f\n", speed);
+
+    return speed;
+}
+
 static void moving_update(struct Gestures* gs,
 			const struct MConfig* cfg,
 			struct MTState* ms)
@@ -914,9 +964,12 @@ static void moving_update(struct Gestures* gs,
 	int i, count, btn_count, dx, dy, dir;
 	double dist;
 	const struct Touch* touches[DIM_TOUCHES];
+    float speed;
 	count = btn_count = 0;
 	dx = dy = 0;
 	dir = 0;
+
+    speed = calculus_speed(gs, cfg, ms);
 
 	// Reset movement.
 	gs->move_dx = 0;
@@ -926,7 +979,11 @@ static void moving_update(struct Gestures* gs,
 	foreach_bit(i, ms->touch_used) {
 		if (GETBIT(ms->touch[i].state, MT_INVALID))
 			continue;
-		else if (GETBIT(ms->touch[i].flags, GS_BUTTON)) {
+
+		ms->touch[i].dx += ms->touch[i].dx * speed;
+		ms->touch[i].dy += ms->touch[i].dy * speed;
+
+		if (GETBIT(ms->touch[i].flags, GS_BUTTON)) {
 			btn_count++;
 			dx += ms->touch[i].dx;
 			dy += ms->touch[i].dy;
