@@ -907,8 +907,6 @@ static int get_scale_dir(const struct Touch* t1,
 	return TR_NONE;
 }
 
-#define  SPEED_MAX 1000
-
 static float calculus_speed(struct Gestures* gs,
 			const struct MConfig* cfg,
 			struct MTState* ms)
@@ -926,14 +924,11 @@ static float calculus_speed(struct Gestures* gs,
         dy += abs(ms->touch[i].dy);
 	}
 
-
-
     int time = gs->time.tv_sec * 1000000 - last.tv_sec * 1000000 +
         gs->time.tv_usec - last.tv_usec;
 
-    if (time > 1000 * 1000 * 3)
+    if (time > 1000 * 1000 * 3 || time <= 0)
     {
-//        printf("Too long\n");
         speed = 0;
         dest = (dx + dy) / 2;
         last = gs->time;
@@ -944,15 +939,13 @@ static float calculus_speed(struct Gestures* gs,
 
     if (time > 1000 * 100)
     {
- //       printf("* speed: %d time %d dest %d\n", speed, time, dest);
-        speed = time ? dest * 1000 / time: SPEED_MAX;
-        speed = speed > 20 ? 20 : speed;
-        speed = speed < 8 ? 1.0 : speed / 8;
+        speed = dest * 1000 / time;
+        speed = speed > cfg->acceleration_max ? cfg->acceleration_max : speed;
+        speed = speed / cfg->acceleration_max;
 
         dest = 0;
         last = gs->time;
     }
-//    printf("# speed: %f\n", speed);
 
     return speed;
 }
