@@ -556,6 +556,7 @@ static int trigger_swipe_unsafe(struct Gestures* gs,
 	dir = get_swipe_dir_n(touches, touches_count);
 	dir = trig_generalize(dir);
 	button = get_button_for_dir(cfg_swipe, dir);
+    xf86Msg(X_ERROR, "get_button_for_dir: %d\n", button);
 
 	trigger_drag_stop(gs, 1);
 	get_swipe_avg_xy(touches, touches_count, &avg_move_x, &avg_move_y);
@@ -583,8 +584,9 @@ static int trigger_swipe_unsafe(struct Gestures* gs,
 	/* Special case for smooth scrolling */
 	if(cfg->scroll_smooth && button >= 4 && button <= 7){
 		/* Calculate speed vector */
-		gs->scroll_speed_x = avg_move_x/(float)timertoms(&gs->dt);
-		gs->scroll_speed_y = avg_move_y/(float)timertoms(&gs->dt);
+		gs->scroll_speed_x = avg_move_x/(float)timertoms(&gs->dt)/2000;
+		gs->scroll_speed_y = avg_move_y/(float)timertoms(&gs->dt)/2000;
+
 		/* Detect 'natural scrolling' - situation when user flipped scroll up and
 		 * down buttons.
 		 * Convert active button to direction of speed vector.
@@ -596,10 +598,24 @@ static int trigger_swipe_unsafe(struct Gestures* gs,
 		case 7: gs->scroll_speed_x = ABSVAL(gs->scroll_speed_x); break;   /* scroll right */
 		}
 		/* Reset current tick. */
-		gs->scroll_coast_tick_no = 0;
+		gs->scroll_coast_tick_no = (ABSVAL(avg_move_x) + ABSVAL(avg_move_y)) / 6;
+
+		gs->scroll_coast_tick_no = gs->scroll_coast_tick_no > 50 ? 50 : gs->scroll_coast_tick_no;
+	    xf86Msg(X_ERROR, "gs->scroll_coast_tick_no: %d avg_move_x: %f  avg_move_y: %f\n",
+         gs->scroll_coast_tick_no, avg_move_x , avg_move_y);
+
+        if (gs->scroll_coast_tick_no < 5)
+        {
+		    gs->scroll_speed_x = 0;
+		    gs->scroll_speed_y = 0;
+        }
+        else{
+            return 1;
+        }
 		/* Don't modulo move_dist */
 	}
-	else if (cfg_swipe->dist > 0 && gs->move_dist >= cfg_swipe->dist) {
+
+	if (cfg_swipe->dist > 0 && gs->move_dist >= cfg_swipe->dist) {
 		if(cfg_swipe->hold != 0)
 			timeraddms(&gs->time, cfg_swipe->hold, &tv_tmp);
 		else
@@ -907,15 +923,13 @@ static int get_scale_dir(const struct Touch* t1,
 	return TR_NONE;
 }
 
-#define  SPEED_MAX 1000
-
 static float calculus_speed(struct Gestures* gs,
 			const struct MConfig* cfg,
 			struct MTState* ms)
 {
-    static struct timeval last;
-    static int dest;
-    static float speed;
+    static struct timeval last = {0, 0};
+    static int dest = 0;
+    static float speed = 0;
     int dx = 0, dy = 0, i = 0;
 
 	foreach_bit(i, ms->touch_used) {
@@ -931,7 +945,7 @@ static float calculus_speed(struct Gestures* gs,
     int time = gs->time.tv_sec * 1000000 - last.tv_sec * 1000000 +
         gs->time.tv_usec - last.tv_usec;
 
-    if (time > 1000 * 1000 * 3)
+    if (time > 1000 * 1000 * 3 || time <= 0)
     {
 //        printf("Too long\n");
         speed = 0;
@@ -945,14 +959,14 @@ static float calculus_speed(struct Gestures* gs,
     if (time > 1000 * 100)
     {
  //       printf("* speed: %d time %d dest %d\n", speed, time, dest);
-        speed = time ? dest * 1000 / time: SPEED_MAX;
+        speed = dest * 1000 / time;
         speed = speed > 20 ? 20 : speed;
-        speed = speed < 8 ? 1.0 : speed / 8;
+        speed = speed / 10;
 
         dest = 0;
         last = gs->time;
     }
-//    printf("# speed: %f\n", speed);
+    //printf("# speed: %f %d %d \n", speed, dest, time);
 
     return speed;
 }
@@ -1131,9 +1145,10 @@ int gestures_delayed(struct MTouch* mt)
 	}
 
 	/* Condition: check for coasting */
-	if(fingers_released >= 1 /*&& fingers_used == 0 */ &&
-		 /*button >= 4 && button <= 7 &&*/
+	if(fingers_released >= 1 && fingers_used == 0 &&
+		/* button >= 4 && button <= 7 && */
 		 can_trigger_coasting(mt)){
+        xf86Msg(X_ERROR, "install timer\n");
 		trigger_delayed_button_unsafe(gs);
 		gs->move_dx = gs->move_dy = 0;
 		gs->move_type = GS_NONE;

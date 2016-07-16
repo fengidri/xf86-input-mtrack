@@ -236,7 +236,8 @@ static void set_and_post_mask(struct MTouch *mt, DeviceIntPtr dev,
 	case GS_NONE:
 		/* Only scroll, or swipe or move can trigger coasting right now */
 		/* Continue coasting if enabled */
-		speed_factor = (mt->cfg.scroll_coast.num_of_ticks - gs->scroll_coast_tick_no) / (float)(mt->cfg.scroll_coast.num_of_ticks);
+//#speed_factor = (mt->cfg.scroll_coast.num_of_ticks - gs->scroll_coast_tick_no) / (float)(mt->cfg.scroll_coast.num_of_ticks);
+		speed_factor = gs->scroll_coast_tick_no;
 		if (ABSVAL(gs->scroll_speed_x) > mt->cfg.scroll_coast.min_speed)
 			valuator_mask_set_double(mask, 2, gs->scroll_speed_x * delta_t * speed_factor);
 		if (ABSVAL(gs->scroll_speed_y) > mt->cfg.scroll_coast.min_speed)
@@ -312,19 +313,22 @@ static CARD32 coasting_delayed(OsTimerPtr timer, CARD32 time, void *arg){
   LocalDevicePtr local = arg;
 	struct MTouch *mt = local->private;
 
+	xf86Msg(X_ERROR, "coasting_delayed: tick_no: %d speed_x=%f, speed_y=%f, dir=%i\n",
+            mt->gs.scroll_coast_tick_no,
+            mt->gs.scroll_speed_x, mt->gs.scroll_speed_y, mt->gs.move_dir);
 #if DEBUG_DRIVER
 	xf86Msg(X_INFO, "coasting_delayed: speed_x=%f, speed_y=%f, dir=%i\n", mt->gs.scroll_speed_x, mt->gs.scroll_speed_y, mt->gs.move_dir);
 #endif
 	set_and_post_mask(mt, local->dev, mt->cfg.scroll_coast.tick_ms);
 
-	if (mt->gs.scroll_coast_tick_no >= mt->cfg.scroll_coast.num_of_ticks){
+	if (mt->gs.scroll_coast_tick_no <= 0){
 		mt->gs.scroll_speed_x = mt->gs.scroll_speed_y = 0.0;
 		mt->is_timer_installed = 0;
 		TimerCancel(mt->timer);
 		return 0;
 	}
 
-	++mt->gs.scroll_coast_tick_no;
+	--mt->gs.scroll_coast_tick_no;
 	TimerSet(mt->timer, 0, mt->cfg.scroll_coast.tick_ms, coasting_delayed, local);
 	mt->is_timer_installed = 2;
 
