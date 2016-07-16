@@ -84,6 +84,9 @@ void mconfig_defaults(struct MConfig* cfg)
 	cfg->rotate_lt_btn = DEFAULT_ROTATE_LT_BTN;
 	cfg->rotate_rt_btn = DEFAULT_ROTATE_RT_BTN;
 
+    cfg->acceleration_max = 20;
+    cfg->acceleration_min = 9;
+
 	cfg->hold1_move1_stationary.max_move = DEFAULT_HOLD1_MOVE1_STATIONARY_MAX_MOVE;
 	cfg->hold1_move1_stationary.button = DEFAULT_HOLD1_MOVE1_STATIONARY_BTN;
 	cfg->hold1_move1.dist = DEFAULT_HOLD1_MOVE1_DIST;

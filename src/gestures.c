@@ -940,14 +940,11 @@ static float calculus_speed(struct Gestures* gs,
         dy += abs(ms->touch[i].dy);
 	}
 
-
-
     int time = gs->time.tv_sec * 1000000 - last.tv_sec * 1000000 +
         gs->time.tv_usec - last.tv_usec;
 
     if (time > 1000 * 1000 * 3 || time <= 0)
     {
-//        printf("Too long\n");
         speed = 0;
         dest = (dx + dy) / 2;
         last = gs->time;
@@ -958,16 +955,13 @@ static float calculus_speed(struct Gestures* gs,
 
     if (time > 1000 * 100)
     {
- //       printf("* speed: %d time %d dest %d\n", speed, time, dest);
         speed = dest * 1000 / time;
-        speed = speed > 20 ? 20 : speed;
-        speed = speed / 10;
+        speed = speed > cfg->acceleration_max ? cfg->acceleration_max : speed;
+        speed = speed / cfg->acceleration_max;
 
         dest = 0;
         last = gs->time;
     }
-    //printf("# speed: %f %d %d \n", speed, dest, time);
-
     return speed;
 }
 
